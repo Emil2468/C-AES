@@ -18,6 +18,7 @@ uchar hexToUchar(char* hex) {
     return (fstChar * 16 + sndChar);
 }
 
+
 char* blockToHex(Block b) {
     char *hex = malloc(32); //string will contain 32 chars
     for(int i = 0; i < 16; i++) {

@@ -7,38 +7,44 @@
 void EncryptFile(char* fileName, char* newFileName, Block key);
 int numberOfBlocks(int fileSize);
 int GetFileSize(FILE *file);
-void FileToBlocks(FILE *file, int nOfBlocks, Block* emptyBlocks);
-Block *blocks;
+Block FileToBlock(FILE *file);
+void PrintBytesInBlock(Block b);
+void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName);
+
 int main(int argc, char const *argv[])
 {   
-    
-    FILE *file = fopen("Resources/TestDoc", "r");
-    int size = GetFileSize(file);
-    int nOfBlocks = numberOfBlocks(size);
-    blocks = malloc(sizeof(Block) * nOfBlocks);
-    FileToBlocks(file, nOfBlocks, blocks);
-    // for(int i = 0; i < nOfBlocks; i++) {
-    //     //printf("%s\n", blockToHex(*(filledBlocks + i)));
-    // }
+    Block key = hexToBlock("12e3f7817e8a6b5c6f5a436e7b9c9e8a");
+    EncryptFile("Resources/TestDoc", "Resources/EncryptedDoc", key);
     return 0;
 }
 
 void EncryptFile(char* fileName, char* newFileName, Block key) {
-    FILE *fp;
-    long int size;
-    fp = fopen(fileName, "r");
-    if(fp == NULL) {
-        printf("File couldn't open\n");
-        return;
+    FILE *file = fopen("Resources/TestDoc", "r");
+    int size = GetFileSize(file);
+    int nOfBlocks = numberOfBlocks(size);
+    printf("%i blocks needed\n", nOfBlocks);
+    Block blocks[nOfBlocks];
+    for(int i = 0; i < nOfBlocks; i++) {
+        blocks[i] = FileToBlock(file);
     }
-    fseek(fp, 0L, SEEK_END);
-    size = ftell(fp); 
-    rewind(fp);
-    int n = fgetc(fp);
-    while(n != EOF) {
-        
+    // for(int i = 0; i < nOfBlocks; i++) {
+    //     printf("%s\n", blockToHex(blocks[i]));
+    // }
+    Block encryptedBlocks[nOfBlocks];
+    for(int i = 0; i < nOfBlocks; i++) {
+        encryptedBlocks[i] = Encrypt(key, blocks[i]);
     }
-    fclose(fp);
+    WriteBlocksToFile(encryptedBlocks, nOfBlocks, newFileName);
+}
+
+void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName) {
+    FILE *file = fopen(fileName, "w");
+    for(int i = 0; i < nOfBlocks; i++) {
+        for(int j = 0; j < 16; j++) {
+            fputc((char)blocks[i].bytes[j], file);
+        }
+    }
+    fclose(file);
 }
 
 int GetFileSize(FILE* file) {
@@ -48,35 +54,42 @@ int GetFileSize(FILE* file) {
     return size;
 }
 
-void FileToBlocks(FILE *file, int nOfBlocks, Block* emptyBlocks) {
+//Reads 128 bytes from file and returns block containing those, does not close file after
+Block FileToBlock(FILE *file) {
     int toPad = 0;
-    for(int i = 0; i < nOfBlocks; i++) {
-        for(int j = 0; j < 128; j++) {
-            int n = fgetc(file);
-            if(n != EOF) {
-                (*(emptyBlocks + i)).bytes[j] = (uchar)n;
-            } else {
-                toPad = 128 - j; //No more chars, so we need to pad the rest
-                break;
-            }
+    Block block;
+    //printf("%i\n", ftell(file));
+    for(int i = 0; i < 16; i++) {
+        int n = fgetc(file);
+        if(n != EOF) {
+            block.bytes[i] = (uchar)n;
+        } else {
+            toPad = 16 - i; //No more chars, so we need to pad the rest
+            break;
         }
     }
     //Pad the remaining part of the block
-    for(int i = toPad; i < 128; i++) {
-        (*(emptyBlocks + nOfBlocks - 1)).bytes[i] = toPad;
+    for(int i = 16 - toPad; i < 16; i++) {
+       block.bytes[i] = toPad;
     }
-    fclose(file);
+    return block;
 }
 
 int numberOfBlocks(int fileSize) {
-    int n = fileSize / 128;
-    if (128 * n == fileSize) {
+    int n = fileSize / 16;
+    if (16 * n == fileSize) {
         return n;
     } else {
         return n + 1;
     }
 }
 
+void PrintBytesInBlock(Block b) {
+    for(int i = 0; i < 16; i++) {
+        printf("%i, ", b.bytes[i]);
+    }
+    printf("\n");
+}
 void EncryptionTest() {
     char* keyChars = "000102030405060708090a0b0c0d0e0e";
     char* input = "00112233445566778899aabbccddeefe";
