@@ -54,6 +54,7 @@ char* ucharToHex(uchar value) {
  * using the Russian Peasant Multiplication algorithm
  * (the other way being to do carry-less multiplication followed by a modular reduction)
  */
+//Copied from Wikipedia :I
 uchar gmul(int a, int b) {
 	uchar p = 0; /* the product of the multiplication */
 	while (a && b) {

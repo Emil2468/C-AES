@@ -10,31 +10,68 @@ int GetFileSize(FILE *file);
 Block FileToBlock(FILE *file);
 void PrintBytesInBlock(Block b);
 void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName);
+void DecryptFile(char* fileName, char* newFileName, Block key);
+Block RemovePadding(Block b);
 
 int main(int argc, char const *argv[])
 {   
     Block key = hexToBlock("12e3f7817e8a6b5c6f5a436e7b9c9e8a");
-    EncryptFile("Resources/TestDoc", "Resources/EncryptedDoc", key);
+    EncryptFile("Resources/Main", "Resources/EncMain", key);
+    printf("\n");
+    DecryptFile("Resources/EncMain", "Resources/DecMain", key);
     return 0;
 }
 
 void EncryptFile(char* fileName, char* newFileName, Block key) {
-    FILE *file = fopen("Resources/TestDoc", "r");
+    FILE *file = fopen(fileName, "r");
+    if(file == NULL) {
+        printf("ERROR: file not found\n");
+        return;
+    }
     int size = GetFileSize(file);
     int nOfBlocks = numberOfBlocks(size);
     printf("%i blocks needed\n", nOfBlocks);
     Block blocks[nOfBlocks];
+    printf("Converting file to blocks\n");
     for(int i = 0; i < nOfBlocks; i++) {
         blocks[i] = FileToBlock(file);
     }
     // for(int i = 0; i < nOfBlocks; i++) {
     //     printf("%s\n", blockToHex(blocks[i]));
     // }
+    printf("Encrypting\n");
     Block encryptedBlocks[nOfBlocks];
     for(int i = 0; i < nOfBlocks; i++) {
         encryptedBlocks[i] = Encrypt(key, blocks[i]);
     }
+    printf("Writing to new file\n");
     WriteBlocksToFile(encryptedBlocks, nOfBlocks, newFileName);
+    printf("Done\n");
+}
+
+void DecryptFile(char* fileName, char* newFileName, Block key) {
+    FILE *file = fopen(fileName, "r");
+    if(file == NULL) {
+        printf("ERROR: file not found\n");
+        return;
+    }
+    int size = GetFileSize(file);
+    int nOfBlocks = numberOfBlocks(size);
+    printf("%i blocks needed\n", nOfBlocks);
+    Block blocks[nOfBlocks];
+    printf("Converting file to blocks\n");
+    for(int i = 0; i < nOfBlocks; i++) {
+        blocks[i] = FileToBlock(file);
+    }
+    printf("Decrypting\n");
+    Block decryptedBlocks[nOfBlocks];
+    for(int i = 0; i < nOfBlocks; i++) {
+        decryptedBlocks[i] = Decrypt(key, blocks[i]);
+    }
+    printf("Writing to new file\n");
+    decryptedBlocks[nOfBlocks - 1] = RemovePadding(decryptedBlocks[nOfBlocks - 1]);
+    WriteBlocksToFile(decryptedBlocks, nOfBlocks, newFileName);
+    printf("Done\n");
 }
 
 void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName) {
@@ -45,6 +82,19 @@ void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName) {
         }
     }
     fclose(file);
+}
+
+Block RemovePadding(Block b) {
+    int counter = 1;
+    while(b.bytes[15 - (counter - 1)] == b.bytes[15 - (counter)]) {
+        counter++;
+    }
+    if(counter == b.bytes[15]) { //If this is true, we have found the right amount of padding
+        for(int i = 16 - counter; i < 16; i++) {
+            b.bytes[i] = 0x00;
+        }
+    } 
+    return b;
 }
 
 int GetFileSize(FILE* file) {
