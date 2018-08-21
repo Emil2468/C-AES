@@ -11,67 +11,78 @@ Block FileToBlock(FILE *file);
 void PrintBytesInBlock(Block b);
 void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName);
 void DecryptFile(char* fileName, char* newFileName, Block key);
+void WriteOneBlockToFile(Block block, FILE *file);
 Block RemovePadding(Block b);
 
-int main(int argc, char const *argv[])
+int main(int argc, char *argv[])
 {   
-    Block key = hexToBlock("12e3f7817e8a6b5c6f5a436e7b9c9e8a");
-    EncryptFile("Resources/Main", "Resources/EncMain", key);
-    printf("\n");
-    DecryptFile("Resources/EncMain", "Resources/DecMain", key);
+    if(argc != 5) {
+        printf("Wrong number of arguments. Expected the following: key, old file, new file, command (enc or dec)\n");
+        return 1;
+    } 
+    char *argsCopy[argc];
+    for(int i = 0; i < argc; i++) {
+        argsCopy[i] = argv[i];
+    }
+    Block key = hexToBlock(argsCopy[1]);
+    if (strcmp(argsCopy[4], "enc") == 0) {
+        EncryptFile(argsCopy[2], argsCopy[3], key);
+    } else if(strcmp(argsCopy[4], "dec") == 0){
+        DecryptFile(argsCopy[2], argsCopy[3], key);
+    } else {
+        printf("Command not understood: %s\n", argsCopy[4]);
+        return 1;
+    }
+    
     return 0;
 }
 
+
 void EncryptFile(char* fileName, char* newFileName, Block key) {
     FILE *file = fopen(fileName, "r");
+    FILE *newFile = fopen(newFileName, "w");
     if(file == NULL) {
         printf("ERROR: file not found\n");
         return;
     }
     int size = GetFileSize(file);
     int nOfBlocks = numberOfBlocks(size);
-    printf("%i blocks needed\n", nOfBlocks);
-    Block blocks[nOfBlocks];
-    printf("Converting file to blocks\n");
+    printf("Blocks needed: %i\n", nOfBlocks);
+    Block plainBlock;
+    Block encryptedBlock;
     for(int i = 0; i < nOfBlocks; i++) {
-        blocks[i] = FileToBlock(file);
+        plainBlock = FileToBlock(file);
+        encryptedBlock = Encrypt(key, plainBlock);
+        WriteOneBlockToFile(encryptedBlock, newFile);
     }
-    // for(int i = 0; i < nOfBlocks; i++) {
-    //     printf("%s\n", blockToHex(blocks[i]));
-    // }
-    printf("Encrypting\n");
-    Block encryptedBlocks[nOfBlocks];
-    for(int i = 0; i < nOfBlocks; i++) {
-        encryptedBlocks[i] = Encrypt(key, blocks[i]);
-    }
-    printf("Writing to new file\n");
-    WriteBlocksToFile(encryptedBlocks, nOfBlocks, newFileName);
-    printf("Done\n");
+    fclose(file);
+    fclose(newFile);
+    printf("Done encrypting file\n");
 }
 
 void DecryptFile(char* fileName, char* newFileName, Block key) {
     FILE *file = fopen(fileName, "r");
+    FILE *newFile = fopen(newFileName, "w");
     if(file == NULL) {
         printf("ERROR: file not found\n");
         return;
     }
     int size = GetFileSize(file);
     int nOfBlocks = numberOfBlocks(size);
-    printf("%i blocks needed\n", nOfBlocks);
-    Block blocks[nOfBlocks];
-    printf("Converting file to blocks\n");
+    printf("Blocks needed: %i\n", nOfBlocks);
+    Block plainBlock;
+    Block decryptedBlock;
     for(int i = 0; i < nOfBlocks; i++) {
-        blocks[i] = FileToBlock(file);
+        plainBlock = FileToBlock(file);
+        decryptedBlock = Decrypt(key, plainBlock);
+        if(i == nOfBlocks - 1) {
+            decryptedBlock = RemovePadding(decryptedBlock);
+        }
+        WriteOneBlockToFile(decryptedBlock, newFile);
     }
-    printf("Decrypting\n");
-    Block decryptedBlocks[nOfBlocks];
-    for(int i = 0; i < nOfBlocks; i++) {
-        decryptedBlocks[i] = Decrypt(key, blocks[i]);
-    }
-    printf("Writing to new file\n");
-    decryptedBlocks[nOfBlocks - 1] = RemovePadding(decryptedBlocks[nOfBlocks - 1]);
-    WriteBlocksToFile(decryptedBlocks, nOfBlocks, newFileName);
-    printf("Done\n");
+    fclose(file);
+    fclose(newFile);
+    printf("Done decrypting file\n");
 }
 
 void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName) {
@@ -82,6 +93,12 @@ void WriteBlocksToFile(Block blocks[], int nOfBlocks, char* fileName) {
         }
     }
     fclose(file);
+}
+
+void WriteOneBlockToFile(Block block, FILE *file) {
+    for(int j = 0; j < 16; j++) {
+        fputc((char)block.bytes[j], file);
+    }
 }
 
 Block RemovePadding(Block b) {
@@ -104,7 +121,7 @@ int GetFileSize(FILE* file) {
     return size;
 }
 
-//Reads 128 bytes from file and returns block containing those, does not close file after
+//Reads 16 bytes from file and returns block containing those, does not close file after
 Block FileToBlock(FILE *file) {
     int toPad = 0;
     Block block;
